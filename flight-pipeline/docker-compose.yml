@@ -1,0 +1,279 @@
+# docker-compose.yml
+# This file defines ALL services in our pipeline
+# Run with: docker compose up -d
+
+version: '3.8'
+
+# ─────────────────────────────────────────────────────────────
+# NETWORKS
+# All services communicate through this internal network
+# They refer to each other by service name (e.g., "postgres", "kafka")
+# ─────────────────────────────────────────────────────────────
+networks:
+  flight_network:
+    driver: bridge
+
+# ─────────────────────────────────────────────────────────────
+# VOLUMES
+# Persistent storage — data survives container restarts
+# Without volumes, all data is lost when a container stops
+# ─────────────────────────────────────────────────────────────
+volumes:
+  postgres_data:        # PostgreSQL database files
+  redis_data:           # Redis cache data
+  kafka_data:           # Kafka message logs
+  zookeeper_data:       # Zookeeper coordination data
+  airflow_logs:         # Airflow task execution logs
+
+# ─────────────────────────────────────────────────────────────
+# SERVICES
+# Each service is one running container
+# ─────────────────────────────────────────────────────────────
+services:
+
+  # ───────────────────────────────────────────────────────────
+  # ZOOKEEPER
+  # Kafka's coordination service — manages broker metadata
+  # Think of it as Kafka's "phone book"
+  # Must start BEFORE Kafka
+  # ───────────────────────────────────────────────────────────
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.0
+    container_name: flight_zookeeper
+    networks:
+      - flight_network
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181       # Port Kafka uses to talk to Zookeeper
+      ZOOKEEPER_TICK_TIME: 2000         # Heartbeat interval in milliseconds
+    volumes:
+      - zookeeper_data:/var/lib/zookeeper/data
+    healthcheck:
+      test: echo srvr | nc localhost 2181 || exit 1
+      interval: 10s
+      timeout: 10s
+      retries: 20
+
+  # ───────────────────────────────────────────────────────────
+  # KAFKA
+  # The message streaming platform
+  # Receives flight events and holds them until consumed
+  # ───────────────────────────────────────────────────────────
+  kafka:
+    image: confluentinc/cp-kafka:7.6.0
+    container_name: flight_kafka
+    networks:
+      - flight_network
+    depends_on:
+      zookeeper:
+        condition: service_healthy     # Wait for Zookeeper to be ready
+    ports:
+      - "9092:9092"                    # Expose to your laptop so Python scripts can connect
+    environment:
+      KAFKA_BROKER_ID: 1                              # Unique ID for this broker
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181         # Where to find Zookeeper
+      # INTERNAL: how containers talk to Kafka inside Docker network
+      # EXTERNAL: how your laptop scripts talk to Kafka
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:29092,EXTERNAL://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1      # 1 = no replication (fine for dev)
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'        # Topics auto-created when used
+      KAFKA_LOG_RETENTION_HOURS: 24                  # Keep messages for 24 hours
+      KAFKA_LOG_SEGMENT_BYTES: 1073741824            # 1GB log segment size
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    healthcheck:
+      test: kafka-topics --bootstrap-server localhost:9092 --list || exit 1
+      interval: 15s
+      timeout: 10s
+      retries: 20
+
+  # ───────────────────────────────────────────────────────────
+  # KAFKA UI
+  # A web interface to inspect Kafka topics and messages
+  # Access at: http://localhost:8085
+  # ───────────────────────────────────────────────────────────
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: flight_kafka_ui
+    networks:
+      - flight_network
+    depends_on:
+      kafka:
+        condition: service_healthy
+    ports:
+      - "8085:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: flight-cluster
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+      KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+
+  # ───────────────────────────────────────────────────────────
+  # POSTGRESQL
+  # Serves two purposes:
+  #   1. Airflow's metadata database (stores DAG runs, task states)
+  #   2. Our staging database for cleaned flight data
+  # ───────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:15-alpine              # Alpine = smaller image size
+    container_name: flight_postgres
+    networks:
+      - flight_network
+    ports:
+      - "5432:5432"                        # Exposed so VS Code SQLTools can connect
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}      # Reads from your .env file
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql  # Runs on first start
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ───────────────────────────────────────────────────────────
+  # REDIS
+  # In-memory cache used by Airflow's CeleryExecutor
+  # Think of it as a fast task queue between Airflow scheduler
+  # and Airflow workers
+  # ───────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: flight_redis
+    networks:
+      - flight_network
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ───────────────────────────────────────────────────────────
+  # AIRFLOW — COMMON CONFIGURATION
+  # The x-airflow-common section is YAML anchoring
+  # It lets us reuse the same config across multiple Airflow services
+  # Without this we'd repeat 30 lines 4 times
+  # ───────────────────────────────────────────────────────────
+  x-airflow-common: &airflow-common
+    image: apache/airflow:2.9.1-python3.11
+    networks:
+      - flight_network
+    env_file:
+      - .env
+    environment:
+      # Tell Airflow WHERE its metadata database is
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      # Tell Airflow to use Celery (distributed task execution)
+      AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      # Tell Celery where its broker (Redis) is
+      AIRFLOW__CELERY__BROKER_URL: redis://:@redis:6379/0
+      AIRFLOW__CORE__EXECUTOR: CeleryExecutor
+      AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW__CORE__FERNET_KEY}
+      AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW__WEBSERVER__SECRET_KEY}
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: 'true'
+    volumes:
+      # Mount your local dags/ folder INTO the container
+      # Any .py file you save locally appears instantly in Airflow
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/plugins:/opt/airflow/plugins
+      - airflow_logs:/opt/airflow/logs
+      # Mount your entire project so DAGs can import your modules
+      - .:/opt/airflow/project
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ───────────────────────────────────────────────────────────
+  # AIRFLOW WEBSERVER
+  # The UI you'll use at http://localhost:8080
+  # Username: admin, Password: admin
+  # ───────────────────────────────────────────────────────────
+  airflow-webserver:
+    <<: *airflow-common                    # Inherit all common config above
+    container_name: flight_airflow_webserver
+    command: webserver
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  # ───────────────────────────────────────────────────────────
+  # AIRFLOW SCHEDULER
+  # Reads your DAG files and triggers tasks at the right time
+  # This is the "brain" of Airflow
+  # ───────────────────────────────────────────────────────────
+  airflow-scheduler:
+    <<: *airflow-common
+    container_name: flight_airflow_scheduler
+    command: scheduler
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8974/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  # ───────────────────────────────────────────────────────────
+  # AIRFLOW WORKER
+  # Actually executes the tasks scheduled by the Scheduler
+  # You can run multiple workers to handle more tasks in parallel
+  # ───────────────────────────────────────────────────────────
+  airflow-worker:
+    <<: *airflow-common
+    container_name: flight_airflow_worker
+    command: celery worker
+
+  # ───────────────────────────────────────────────────────────
+  # AIRFLOW INIT
+  # Runs ONCE on first startup to:
+  #   1. Create the database tables Airflow needs
+  #   2. Create your admin user
+  # After running, this container exits (that's expected!)
+  # ───────────────────────────────────────────────────────────
+  airflow-init:
+    <<: *airflow-common
+    container_name: flight_airflow_init
+    command: >
+      bash -c "
+        airflow db migrate &&
+        airflow users create
+          --username admin
+          --firstname Admin
+          --lastname User
+          --role Admin
+          --email admin@flightpipeline.com
+          --password admin
+      "
+    restart: "no"                          # Only run once — don't restart
+
+  # ───────────────────────────────────────────────────────────
+  # STREAMLIT DASHBOARD
+  # Will be used in Phase 9 — commented out for now
+  # Uncomment when you reach Phase 9
+  # ───────────────────────────────────────────────────────────
+  # dashboard:
+  #   build:
+  #     context: .
+  #     dockerfile: dashboard/Dockerfile
+  #   container_name: flight_dashboard
+  #   networks:
+  #     - flight_network
+  #   ports:
+  #     - "8501:8501"
+  #   env_file:
+  #     - .env

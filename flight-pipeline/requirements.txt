@@ -1,0 +1,40 @@
+# requirements.txt
+# Pin exact versions for reproducibility — this is production practice
+
+# ─── Airflow ─────────────────────────────────────────────
+apache-airflow==2.9.1
+apache-airflow-providers-snowflake==5.3.0
+apache-airflow-providers-postgres==5.10.0
+
+# ─── Kafka ───────────────────────────────────────────────
+kafka-python==2.0.2
+confluent-kafka==2.4.0
+
+# ─── Snowflake ───────────────────────────────────────────
+snowflake-connector-python==3.10.1
+snowflake-sqlalchemy==1.5.3
+
+# ─── Data Processing ─────────────────────────────────────
+pandas==2.2.2
+numpy==1.26.4
+pyarrow==16.0.0
+
+# ─── Database ────────────────────────────────────────────
+psycopg2-binary==2.9.9
+SQLAlchemy==1.4.52
+
+# ─── API & HTTP ──────────────────────────────────────────
+requests==2.31.0
+python-dotenv==1.0.1
+
+# ─── Dashboard ───────────────────────────────────────────
+streamlit==1.35.0
+plotly==5.22.0
+pydeck==0.9.1
+
+# ─── Data Quality ────────────────────────────────────────
+great-expectations==0.18.15
+
+# ─── Utilities ───────────────────────────────────────────
+python-json-logger==2.0.7
+tenacity==8.3.0
