@@ -84,10 +84,13 @@ class KafkaFlightConsumer:
 
     def _connect_postgres(self) -> None:
         """Connect to PostgreSQL with retry logic."""
+        # Use 127.0.0.1 explicitly to avoid IPv6 issues with "localhost"
+        host = POSTGRES_HOST.replace("localhost", "127.0.0.1") if POSTGRES_HOST == "localhost" else POSTGRES_HOST
+        
         for attempt in range(1, 6):
             try:
                 self.pg_conn = psycopg2.connect(
-                    host    = POSTGRES_HOST,
+                    host    = host,
                     port    = POSTGRES_PORT,
                     user    = POSTGRES_USER,
                     password= POSTGRES_PASSWORD,
@@ -96,7 +99,7 @@ class KafkaFlightConsumer:
                 # autocommit=False means we control transactions manually
                 # This lets us roll back a bad batch atomically
                 self.pg_conn.autocommit = False
-                logger.info("✓ Connected to PostgreSQL at %s:%d", POSTGRES_HOST, POSTGRES_PORT)
+                logger.info("✓ Connected to PostgreSQL at %s:%d", host, POSTGRES_PORT)
                 return
             except psycopg2.OperationalError as e:
                 wait = 2 ** attempt
