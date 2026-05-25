@@ -32,7 +32,13 @@ import time
 from datetime import datetime, timezone
 from typing import Optional
 
+# Remove current project path temporarily
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if project_root in sys.path:
+    sys.path.remove(project_root)
+
 from kafka import KafkaConsumer
+# from kafka.consumer import KafkaConsumer
 from kafka.errors import KafkaError
 import psycopg2
 import psycopg2.extras    # For execute_batch (bulk insert)
