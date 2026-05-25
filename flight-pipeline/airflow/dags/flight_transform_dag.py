@@ -35,7 +35,8 @@ from datetime import datetime, timezone, timedelta
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.providers.snowflake.operators.snowflake import SnowflakeOperator
-from airflow.providers.postgres.sensors.sql import SqlSensor
+# from airflow.providers.postgres.sensors.sql import SqlSensor
+from airflow.sensors.sql import SqlSensor
 
 from dag_utils import (
     DEFAULT_ARGS, SNOWFLAKE_CONN_ID, POSTGRES_CONN_ID,

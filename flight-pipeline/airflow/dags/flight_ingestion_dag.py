@@ -33,7 +33,8 @@ from typing import Any
 from airflow import DAG
 from airflow.operators.python import PythonOperator, BranchPythonOperator
 from airflow.operators.empty import EmptyOperator   # renamed from DummyOperator in 2.4+
-from airflow.providers.postgres.sensors.sql import SqlSensor
+# from airflow.providers.postgres.sensors.sql import SqlSensor
+from airflow.sensors.sql import SqlSensor
 from airflow.providers.postgres.hooks.postgres import PostgresHook
 from airflow.providers.snowflake.operators.snowflake import SnowflakeOperator
 from airflow.models import TaskInstance
