@@ -64,7 +64,7 @@ CREATE TABLE IF NOT EXISTS FLIGHT_DB.ANALYTICS.FACT_FLIGHTS (
 -- Clustered by event_date and airline for the most common query patterns:
 -- "Show me all flights on date X" and "Show me airline Y's performance"
 CLUSTER BY (event_date, airline_iata)
-DATA_RETENTION_TIME_IN_DAYS = 30
+DATA_RETENTION_TIME_IN_DAYS = 1
 COMMENT = 'Central fact table: one row per flight position event. Star schema grain.';
 
 

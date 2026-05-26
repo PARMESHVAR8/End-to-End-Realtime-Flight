@@ -125,7 +125,7 @@ CREATE TABLE IF NOT EXISTS FLIGHT_DB.RAW.FLIGHTS_RAW (
     ingestion_batch_id      VARCHAR(100)
 )
 CLUSTER BY (DATE(event_timestamp))
-DATA_RETENTION_TIME_IN_DAYS = 7    -- Time Travel: query this table as of 7 days ago
+DATA_RETENTION_TIME_IN_DAYS = 1    -- Time Travel: query as of 1 day ago (free tier limit)
 COMMENT = 'Permanent raw layer: immutable flight event records. Source of truth.';
 
 

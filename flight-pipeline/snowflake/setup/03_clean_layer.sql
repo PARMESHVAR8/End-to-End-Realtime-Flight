@@ -82,7 +82,7 @@ CREATE TABLE IF NOT EXISTS FLIGHT_DB.CLEAN.FLIGHTS_CLEAN (
 -- Cluster by event_date (derived from event_timestamp) for fast date queries
 -- AND airline_iata for fast per-airline queries
 CLUSTER BY (DATE(event_timestamp), airline_iata)
-DATA_RETENTION_TIME_IN_DAYS = 14   -- Analysts can query 14 days back in time
+DATA_RETENTION_TIME_IN_DAYS = 1   -- Free tier limit is 1 day
 COMMENT = 'Clean validated flight events with derived columns. Analyst-facing.';
 
 
