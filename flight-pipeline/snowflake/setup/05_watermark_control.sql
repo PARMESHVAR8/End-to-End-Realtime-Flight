@@ -14,6 +14,8 @@ USE WAREHOUSE FLIGHT_WH;
 -- One row per pipeline process.
 -- Updated atomically after each successful run.
 -- ─────────────────────────────────────────────────────────────
+DROP TABLE IF EXISTS FLIGHT_DB.RAW.PIPELINE_WATERMARKS;
+
 CREATE TABLE IF NOT EXISTS FLIGHT_DB.RAW.PIPELINE_WATERMARKS (
     process_name        VARCHAR(100)    PRIMARY KEY,
     -- The timestamp up to which this process has successfully processed data
