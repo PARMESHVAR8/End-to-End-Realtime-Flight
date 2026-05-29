@@ -97,3 +97,121 @@ class KafkaFlightProducer:
 										self.bootstrap_servers, attempt, max_retries
 								)
 								self.producer = KafkaProducer(
+										bootstrap_servers=self.bootstrap_servers,
+										value_serializer=lambda v: json.dumps(v).encode('utf-8'),
+										acks='all',
+										retries=3,
+										compression_type='gzip',
+										request_timeout_ms=30000,
+										batch_size=1000,
+								)
+								logger.info("Connected to Kafka successfully")
+								return
+						except (KafkaError, NoBrokersAvailable) as e:
+								logger.warning(
+										"Kafka connection failed on attempt %d: %s",
+										attempt, e
+								)
+								if attempt < max_retries:
+										wait_time = 2 ** attempt
+										logger.info("Waiting %d seconds before retry...", wait_time)
+										time.sleep(wait_time)
+								else:
+									logger.error("Failed to connect to Kafka after %d attempts", max_retries)
+									raise
+
+		def send_flight_event(self, flight_data: dict, flight_id: Optional[str] = None) -> bool:
+				"""
+				Send a single flight event to Kafka.
+				
+				Args:
+					flight_data: Dictionary with flight information
+					flight_id: Optional flight ID to use as message key
+					
+				Returns:
+					True if sent successfully, False otherwise
+				"""
+				if not self.producer:
+						logger.error("Producer not connected")
+						return False
+				
+				try:
+						key = (flight_id or flight_data.get('flight_id', '')).encode('utf-8')
+						future = self.producer.send(self.topic, value=flight_data, key=key)
+						record_metadata = future.get(timeout=10)
+						
+						self.messages_sent += 1
+						if self.messages_sent % 100 == 0:
+								logger.info(f"Sent {self.messages_sent} messages to {record_metadata.topic}")
+						return True
+						
+				except Exception as e:
+						logger.error(f"Failed to send message: {e}")
+						self.messages_failed += 1
+						return False
+
+		def run(self, source: str = "simulator", interval: int = 5) -> None:
+				"""
+				Main loop: continuously fetch flight data and send to Kafka.
+				
+				Args:
+					source: 'simulator' or 'api'
+					interval: Seconds between fetches
+				"""
+				if source == "simulator":
+						flight_source = FlightSimulator()
+				elif source == "api":
+						flight_source = AviationStackClient()
+				else:
+						raise ValueError(f"Unknown source: {source}")
+				
+				logger.info(f"Starting producer from source: {source}, interval: {interval}s")
+				
+				try:
+						while True:
+								try:
+										flights = flight_source.fetch_flights()
+										for flight in flights:
+												self.send_flight_event(flight)
+										time.sleep(interval)
+								except Exception as e:
+										logger.error(f"Error during fetch cycle: {e}")
+										time.sleep(interval)
+										
+				except KeyboardInterrupt:
+						logger.info("Producer interrupted by user")
+				finally:
+						self.shutdown()
+
+		def shutdown(self) -> None:
+				"""Gracefully shutdown the producer."""
+				if self.producer:
+						self.producer.flush()
+						self.producer.close()
+				logger.info(
+						f"Producer shut down. Sent: {self.messages_sent}, Failed: {self.messages_failed}"
+				)
+
+
+def main():
+		parser = argparse.ArgumentParser(description="Kafka Flight Event Producer")
+		parser.add_argument(
+				"--source",
+				choices=["simulator", "api"],
+				default="simulator",
+				help="Flight data source (default: simulator)"
+		)
+		parser.add_argument(
+				"--interval",
+				type=int,
+				default=5,
+				help="Seconds between data fetches (default: 5)"
+		)
+		args = parser.parse_args()
+		
+		producer = KafkaFlightProducer()
+		producer.run(source=args.source, interval=args.interval)
+
+
+if __name__ == "__main__":
+		main()
