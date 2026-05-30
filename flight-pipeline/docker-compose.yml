@@ -130,6 +130,8 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql  # Runs on first start
+      - ./postgres/pg_hba.conf:/var/lib/postgresql/pg_hba.conf  # Auth configuration
+      - ./postgres/postgresql.conf:/var/lib/postgresql/postgresql.conf  # Password encryption
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U airflow -d airflow"]
       interval: 10s

@@ -4,6 +4,18 @@
 -- (Airflow uses the default 'airflow' database; 
 --  we use 'flight_staging' for our pipeline data)
 
+-- Create the airflow user if it doesn't exist
+DO
+$$ BEGIN
+    CREATE USER airflow WITH PASSWORD 'airflow';
+EXCEPTION WHEN DUPLICATE_OBJECT THEN
+    ALTER USER airflow WITH PASSWORD 'airflow';
+END
+$$;
+
+-- Grant all privileges to airflow user
+ALTER USER airflow CREATEDB;
+
 CREATE DATABASE flight_staging;
 
 -- Connect to the new database and create schema
