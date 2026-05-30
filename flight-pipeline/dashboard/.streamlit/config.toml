@@ -1,0 +1,22 @@
+# dashboard/.streamlit/config.toml
+# Streamlit reads this automatically on startup.
+# Aviation-inspired dark theme.
+
+[theme]
+primaryColor        = "#3B82F6"      # Blue — matches Snowflake brand
+backgroundColor     = "#0F172A"      # Deep navy — aviation cockpit feel
+secondaryBackgroundColor = "#1E293B" # Slightly lighter navy for cards
+textColor           = "#F1F5F9"      # Near-white text
+font                = "sans serif"
+
+[server]
+port                = 8501
+headless            = true           # Required for Docker deployment
+enableCORS          = false
+enableXsrfProtection = true
+
+[browser]
+gatherUsageStats    = false          # Privacy: don't send usage to Streamlit
+
+[runner]
+magicEnabled        = true
