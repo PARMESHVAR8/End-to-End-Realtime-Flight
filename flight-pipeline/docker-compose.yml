@@ -271,14 +271,14 @@ services:
   # Will be used in Phase 9 — commented out for now
   # Uncomment when you reach Phase 9
   # ───────────────────────────────────────────────────────────
-  # dashboard:
-  #   build:
-  #     context: .
-  #     dockerfile: dashboard/Dockerfile
-  #   container_name: flight_dashboard
-  #   networks:
-  #     - flight_network
-  #   ports:
-  #     - "8501:8501"
-  #   env_file:
-  #     - .env
+  dashboard:
+    build:
+      context: .
+      dockerfile: dashboard/Dockerfile
+    container_name: flight_dashboard
+    networks:
+      - flight_network
+    ports:
+      - "8501:8501"
+    env_file:
+      - .env
