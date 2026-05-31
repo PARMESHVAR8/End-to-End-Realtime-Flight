@@ -253,6 +253,9 @@ with DAG(
     # ── TASK 3: Build Fact Table ──────────────────────────────────────────────
     # Runs SQL directly on Snowflake to build the central fact table.
     # ANALYTICS layer tables are the ones the dashboard queries.
+    # airflow/dags/flight_transform_dag.py
+# Find build_fact_flights SnowflakeOperator and replace the sql= with this:
+
     build_fact_flights = SnowflakeOperator(
         task_id           = "build_fact_flights",
         snowflake_conn_id = SNOWFLAKE_CONN_ID,
@@ -260,8 +263,6 @@ with DAG(
         database          = SNOWFLAKE_DATABASE,
         schema            = SNOWFLAKE_SCHEMA_ANALYTICS,
         sql               = """
-            -- Fact table: one row per flight event (grain = one position update)
-            -- Uses MERGE to be idempotent (safe to re-run)
             MERGE INTO FLIGHT_DB.ANALYTICS.FACT_FLIGHTS AS tgt
             USING (
                 SELECT
@@ -270,6 +271,9 @@ with DAG(
                     c.airline_iata,
                     c.source_airport,
                     c.dest_airport,
+                    -- FIX: use COALESCE so route_key always has a value
+                    COALESCE(c.route_key,
+                        c.source_airport || '→' || c.dest_airport) AS route_key,
                     c.latitude,
                     c.longitude,
                     c.altitude,
@@ -281,29 +285,33 @@ with DAG(
                     c.is_international,
                     c.region,
                     c.data_quality_flag,
-                    DATE(c.event_timestamp)            AS event_date,
-                    HOUR(c.event_timestamp)            AS event_hour,
-                    DAYOFWEEK(c.event_timestamp)       AS day_of_week,
+                    DATE(c.event_timestamp)             AS event_date,
+                    HOUR(c.event_timestamp)             AS event_hour,
+                    DAYOFWEEK(c.event_timestamp)        AS day_of_week,
                     c.event_timestamp,
                     c.transformed_at
                 FROM FLIGHT_DB.CLEAN.FLIGHTS_CLEAN c
                 WHERE c.transformed_at >= DATEADD(minute, -20, CURRENT_TIMESTAMP())
-                AND c.data_quality_flag = FALSE
+                AND   c.data_quality_flag = FALSE
             ) AS src
             ON tgt.event_id = src.event_id
-            WHEN NOT MATCHED THEN INSERT
-                (event_id, flight_id, airline_iata, source_airport, dest_airport,
-                 latitude, longitude, altitude, speed, status, delay_minutes,
-                 delay_bucket, flight_phase, is_international, region,
-                 data_quality_flag, event_date, event_hour, day_of_week,
-                 event_timestamp, transformed_at)
-            VALUES
-                (src.event_id, src.flight_id, src.airline_iata, src.source_airport,
-                 src.dest_airport, src.latitude, src.longitude, src.altitude,
-                 src.speed, src.status, src.delay_minutes, src.delay_bucket,
-                 src.flight_phase, src.is_international, src.region,
-                 src.data_quality_flag, src.event_date, src.event_hour,
-                 src.day_of_week, src.event_timestamp, src.transformed_at);
+            WHEN NOT MATCHED THEN INSERT (
+                event_id, flight_id, airline_iata,
+                source_airport, dest_airport, route_key,
+                latitude, longitude, altitude, speed, status,
+                delay_minutes, delay_bucket, flight_phase,
+                is_international, region, data_quality_flag,
+                event_date, event_hour, day_of_week,
+                event_timestamp, transformed_at
+            ) VALUES (
+                src.event_id, src.flight_id, src.airline_iata,
+                src.source_airport, src.dest_airport, src.route_key,
+                src.latitude, src.longitude, src.altitude, src.speed,
+                src.status, src.delay_minutes, src.delay_bucket,
+                src.flight_phase, src.is_international, src.region,
+                src.data_quality_flag, src.event_date, src.event_hour,
+                src.day_of_week, src.event_timestamp, src.transformed_at
+            );
         """,
     )
 

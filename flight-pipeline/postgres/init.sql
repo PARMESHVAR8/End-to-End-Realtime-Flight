@@ -1,21 +1,7 @@
 -- postgres/init.sql
 -- This runs automatically the FIRST TIME PostgreSQL starts
--- It creates a second database for our staging data
--- (Airflow uses the default 'airflow' database; 
---  we use 'flight_staging' for our pipeline data)
 
--- Create the airflow user if it doesn't exist
-DO
-$$ BEGIN
-    CREATE USER airflow WITH PASSWORD 'airflow';
-EXCEPTION WHEN DUPLICATE_OBJECT THEN
-    ALTER USER airflow WITH PASSWORD 'airflow';
-END
-$$;
-
--- Grant all privileges to airflow user
-ALTER USER airflow CREATEDB;
-
+-- Create flight_staging database for our staging data
 CREATE DATABASE flight_staging;
 
 -- Connect to the new database and create schema
@@ -59,5 +45,23 @@ CREATE TABLE IF NOT EXISTS staging.pipeline_runs (
     error_message   TEXT
 );
 
+-- Dead Letter Queue table for failed messages
+CREATE TABLE IF NOT EXISTS staging.dead_letter_queue (
+    id              SERIAL PRIMARY KEY,
+    event_id        VARCHAR(100),
+    flight_id       VARCHAR(50),
+    source          VARCHAR(100),
+    dag_id          VARCHAR(100),
+    run_id          VARCHAR(100),
+    error_message   TEXT,
+    retry_count     INTEGER DEFAULT 0,
+    raw_payload     JSONB,
+    created_at      TIMESTAMP DEFAULT NOW(),
+    status          VARCHAR(50) DEFAULT 'pending'
+);
+
+-- Grant all privileges
 GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA staging TO airflow;
+GRANT USAGE ON SCHEMA staging TO airflow;
+GRANT CREATE ON DATABASE flight_staging TO airflow;
 GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA staging TO airflow;

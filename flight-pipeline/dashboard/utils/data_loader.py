@@ -30,6 +30,7 @@ import pandas as pd
 import streamlit as st
 from dotenv import load_dotenv
 
+
 load_dotenv()
 logger = logging.getLogger(__name__)
 
@@ -56,27 +57,49 @@ def _get_snowflake_connection():
     )
 
 
+# dashboard/utils/data_loader.py
+# Replace the _query_snowflake function with this safer version:
+
 def _query_snowflake(sql: str, params: tuple = ()) -> pd.DataFrame:
     """
     Execute SQL on Snowflake and return as DataFrame.
-    Internal helper — all public methods call this.
+    Returns empty DataFrame (not an error) when table has no rows.
     """
     try:
         conn    = _get_snowflake_connection()
         cursor  = conn.cursor()
         cursor.execute(sql, params)
+
+        if cursor.description is None:
+            cursor.close()
+            conn.close()
+            return pd.DataFrame()
+
         cols    = [desc[0].lower() for desc in cursor.description]
         rows    = cursor.fetchall()
         cursor.close()
         conn.close()
-        df      = pd.DataFrame(rows, columns=cols)
-        logger.info("Query returned %d rows | cols=%d", len(df), len(cols))
-        return df
-    except Exception as e:
-        logger.error("Snowflake query failed: %s", e)
-        st.error(f"Database query failed: {e}")
-        return pd.DataFrame()
 
+        if not rows:
+            # Return empty DataFrame with correct columns — no error shown
+            return pd.DataFrame(columns=cols)
+
+        df = pd.DataFrame(rows, columns=cols)
+        return df
+
+    except Exception as e:
+        error_msg = str(e)
+        # Only show error to user if it's not just "no rows"
+        if "does not exist" in error_msg or "not authorized" in error_msg:
+            st.error(
+                f"⚠️ View not found: {error_msg[:120]}\n\n"
+                f"**Fix:** Run the view creation script in Snowflake. "
+                f"See `snowflake/queries/06_business_analytics.sql`"
+            )
+        else:
+            st.warning(f"Query returned no data: {error_msg[:120]}")
+        logger.error("Snowflake query failed: %s", e)
+        return pd.DataFrame()
 
 # ─── Cached data fetchers ─────────────────────────────────────────────────────
 # Each function is decorated with @st.cache_data(ttl=N)

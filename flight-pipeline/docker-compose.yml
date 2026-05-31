@@ -121,17 +121,18 @@ services:
       - flight_network
     ports:
       - "5432:5432"                        # Exposed so VS Code SQLTools can connect
-    env_file:
-      - .env                               # Load credentials from .env file
     environment:
-      POSTGRES_USER: airflow               # Explicit fallback
+      POSTGRES_USER: airflow
       POSTGRES_PASSWORD: airflow
       POSTGRES_DB: airflow
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql  # Runs on first start
-      - ./postgres/pg_hba.conf:/var/lib/postgresql/pg_hba.conf  # Auth configuration
-      - ./postgres/postgresql.conf:/var/lib/postgresql/postgresql.conf  # Password encryption
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/01_init.sql
+      - ./postgres/pg_hba.conf:/etc/postgresql/pg_hba.conf
+    command:
+      - "postgres"
+      - "-c"
+      - "hba_file=/etc/postgresql/pg_hba.conf"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U airflow -d airflow"]
       interval: 10s
