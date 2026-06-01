@@ -240,36 +240,26 @@ class ColorFormatter(logging.Formatter):
 # ─── Main setup function ──────────────────────────────────────────────────────
 
 def setup_logging(
-    level       : Optional[str] = None,
-    log_format  : Optional[str] = None,
-    log_dir     : Optional[str] = None,
-    correlation_id: Optional[str] = None,
-) -> logging.Logger:
-    """
-    Configure application-wide logging. Call once at startup.
+    level       = None,
+    log_format  = None,
+    log_dir     = None,
+    correlation_id = None,
+):
+    import os, sys, logging, logging.handlers
+    from pathlib import Path
 
-    Args:
-        level         : DEBUG / INFO / WARNING / ERROR (default: env var LOG_LEVEL or INFO)
-        log_format    : "json" or "text" (default: env var LOG_FORMAT or "text")
-        log_dir       : Directory for rotating log files (default: ./logs/)
-        correlation_id: Set a specific correlation ID for this run
-
-    Returns:
-        Root logger (already configured — just call logging.getLogger(__name__) anywhere)
-    """
-    log_level  = (level     or os.getenv("LOG_LEVEL",  "INFO")).upper()
+    log_level  = (level      or os.getenv("LOG_LEVEL",  "INFO")).upper()
     log_format = (log_format or os.getenv("LOG_FORMAT", "text")).lower()
     env        = os.getenv("ENVIRONMENT", "development")
 
     if correlation_id:
         set_correlation_id(correlation_id)
 
-    # Clear any existing handlers (prevents duplicate logs when called multiple times)
     root_logger = logging.getLogger()
     root_logger.handlers.clear()
     root_logger.setLevel(getattr(logging, log_level, logging.INFO))
 
-    # ── Handler 1: Console ────────────────────────────────────────────────────
+    # Console handler — always add this
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setLevel(getattr(logging, log_level, logging.INFO))
 
@@ -280,54 +270,33 @@ def setup_logging(
 
     root_logger.addHandler(console_handler)
 
-    # ── Handler 2: Rotating file log ─────────────────────────────────────────
-    # Rotates daily. Keeps 30 days of logs.
-    # Without rotation, log files grow forever → disk fills up at 3am.
-    if log_dir or os.getenv("LOG_DIR"):
-        actual_log_dir = Path(log_dir or os.getenv("LOG_DIR", "./logs"))
+    # File handler — only add if LOG_DIR is explicitly set
+    # Skip on Windows to avoid file rotation permission errors
+    actual_log_dir = log_dir or os.getenv("LOG_DIR")
+    if actual_log_dir and os.name != "nt":  # "nt" = Windows
+        # Only use file logging on Linux/Mac (not Windows)
+        actual_log_dir = Path(actual_log_dir)
         actual_log_dir.mkdir(parents=True, exist_ok=True)
 
         file_handler = logging.handlers.TimedRotatingFileHandler(
             filename    = actual_log_dir / "flight_pipeline.log",
             when        = "midnight",
             interval    = 1,
-            backupCount = 30,       # Keep 30 days
+            backupCount = 30,
             encoding    = "utf-8",
         )
         file_handler.setLevel(logging.DEBUG)
-        # Always use JSON format in files — easier to parse later
         file_handler.setFormatter(JSONFormatter(env=env))
         root_logger.addHandler(file_handler)
 
-        # Separate error-only log file (makes it easy to grep just errors)
-        error_handler = logging.handlers.TimedRotatingFileHandler(
-            filename    = actual_log_dir / "flight_pipeline_errors.log",
-            when        = "midnight",
-            backupCount = 90,       # Keep errors for 90 days
-            encoding    = "utf-8",
-        )
-        error_handler.setLevel(logging.ERROR)
-        error_handler.setFormatter(JSONFormatter(env=env))
-        root_logger.addHandler(error_handler)
-
-    # ── Suppress noisy third-party libraries ──────────────────────────────────
-    for noisy_lib in ["kafka", "urllib3", "requests", "botocore",
-                      "snowflake.connector", "paramiko"]:
-        logging.getLogger(noisy_lib).setLevel(logging.WARNING)
+    # Suppress noisy libraries
+    for noisy in ["kafka", "urllib3", "requests", "botocore",
+                  "snowflake.connector", "paramiko"]:
+        logging.getLogger(noisy).setLevel(logging.WARNING)
 
     logger = logging.getLogger(__name__)
-    logger.info(
-        "Logging configured",
-        extra={
-            "log_level"       : log_level,
-            "log_format"      : log_format,
-            "env"             : env,
-            "correlation_id"  : get_correlation_id(),
-        }
-    )
+    logger.info("Logging configured | level=%s | format=%s", log_level, log_format)
     return root_logger
-
-
 # ─── Context manager for correlation ID ───────────────────────────────────────
 
 class CorrelatedOperation:
