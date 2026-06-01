@@ -6,7 +6,7 @@ print("Test 1: Connecting as postgres user (no password)...")
 try:
     conn = psycopg2.connect(
         host="127.0.0.1",
-        port=5432,
+        port=5433,
         user="postgres",
         password="",
         dbname="postgres",
@@ -28,7 +28,7 @@ print("\nTest 2: Connecting as airflow user with password 'airflow'...")
 try:
     conn = psycopg2.connect(
         host="127.0.0.1",
-        port=5432,
+        port=5433,
         user="airflow",
         password="airflow",
         dbname="airflow",

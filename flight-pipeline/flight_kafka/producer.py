@@ -191,6 +191,125 @@ class KafkaFlightProducer:
 				logger.info(
 						f"Producer shut down. Sent: {self.messages_sent}, Failed: {self.messages_failed}"
 				)
+		# flight_kafka/producer.py
+# Find the run_streaming_producer function and replace the ENTIRE function with this:
+
+def run_streaming_producer(
+    source: str = "simulator",
+    interval_seconds: float = 5.0,
+    batch_size: int = 10,
+    inject_errors: bool = False,
+) -> None:
+    """
+    Main streaming loop.
+    Runs forever until Ctrl+C or SIGTERM.
+    """
+    logger.info(
+        "Starting flight producer | source=%s | interval=%.1fs | batch_size=%d",
+        source, interval_seconds, batch_size
+    )
+
+    # Initialise data source
+    if source == "simulator":
+        from ingestion.flight_simulator import FlightSimulator
+        data_source = FlightSimulator(inject_errors=inject_errors)
+        logger.info("Using SIMULATOR as data source")
+        use_simulator = True
+    else:
+        from ingestion.api_client import AviationStackClient
+        data_source = AviationStackClient()
+        logger.info("Using AVIATIONSTACK API as data source")
+        use_simulator = False
+
+    # Initialise Kafka producer
+    producer = KafkaFlightProducer()
+
+    # Graceful shutdown handler
+    shutdown_requested = False
+
+    def handle_shutdown(signum, frame):
+        nonlocal shutdown_requested
+        logger.info("Shutdown signal received. Finishing current batch...")
+        shutdown_requested = True
+
+    import signal
+    signal.signal(signal.SIGINT,  handle_shutdown)
+    signal.signal(signal.SIGTERM, handle_shutdown)
+
+    # Main loop
+    batch_number  = 0
+    total_events  = 0
+
+    try:
+        while not shutdown_requested:
+            batch_number += 1
+            start_time = time.time()
+
+            # ── Generate events ───────────────────────────────────────────
+            try:
+                if use_simulator:
+                    # FlightSimulator uses generate_batch()
+                    events = data_source.generate_batch(batch_size)
+                else:
+                    # API client uses get_live_flights()
+                    events = data_source.get_live_flights(
+                        limit=batch_size,
+                        flight_status="active"
+                    )
+                    if not events:
+                        logger.warning("API returned 0 events. Falling back to simulator.")
+                        from ingestion.flight_simulator import FlightSimulator
+                        fallback = FlightSimulator()
+                        events = fallback.generate_batch(batch_size)
+            except Exception as e:
+                logger.error("Error generating events: %s", e)
+                time.sleep(interval_seconds)
+                continue
+
+            # ── Send to Kafka ─────────────────────────────────────────────
+            result = producer.send_batch(events)
+            total_events += result["success"]
+
+            elapsed = time.time() - start_time
+            logger.info(
+                "Batch %04d | sent=%d | failed=%d | elapsed=%.2fs | total=%d",
+                batch_number,
+                result["success"],
+                result["failed"],
+                elapsed,
+                total_events,
+            )
+
+            # Sleep until next interval
+            sleep_time = max(0, interval_seconds - elapsed)
+            if sleep_time > 0 and not shutdown_requested:
+                time.sleep(sleep_time)
+
+    finally:
+        producer.close()
+        logger.info("Producer stopped. Total events: %d", total_events)
+
+	# flight_kafka/producer.py
+# Inside the KafkaFlightProducer class, add this method if it doesn't exist:
+
+    def send_batch(self, events: list) -> dict:
+        """Send multiple events and flush."""
+        success_count = 0
+        failed_count  = 0
+
+        for event in events:
+            if self.send_event(event):
+                success_count += 1
+            else:
+                failed_count += 1
+
+        # Flush — block until Kafka confirms receipt
+        try:
+            self.producer.flush(timeout=30)
+        except Exception as e:
+            logger.error("Flush error: %s", e)
+
+        return {"success": success_count, "failed": failed_count}
 
 
 def main():

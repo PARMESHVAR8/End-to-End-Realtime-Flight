@@ -92,7 +92,7 @@ def get_postgres_connection():
     import psycopg2
     return psycopg2.connect(
         host    = os.getenv("POSTGRES_HOST", "postgres"),
-        port    = int(os.getenv("POSTGRES_PORT", "5432")),
+        port    = int(os.getenv("POSTGRES_PORT", "5433")),
         user    = os.getenv("POSTGRES_USER", "airflow"),
         password= os.getenv("POSTGRES_PASSWORD", "airflow"),
         dbname  = os.getenv("POSTGRES_DB", "airflow"),

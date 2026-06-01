@@ -206,7 +206,7 @@ class HealthChecker:
             import psycopg2
             conn = psycopg2.connect(
                 host    = os.getenv("POSTGRES_HOST", "localhost"),
-                port    = int(os.getenv("POSTGRES_PORT", "5432")),
+                port    = int(os.getenv("POSTGRES_PORT", "5433")),
                 user    = os.getenv("POSTGRES_USER", "airflow"),
                 password= os.getenv("POSTGRES_PASSWORD", "airflow"),
                 dbname  = os.getenv("POSTGRES_DB", "airflow"),

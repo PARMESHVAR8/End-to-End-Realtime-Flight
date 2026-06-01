@@ -9,7 +9,7 @@ load_dotenv()
 import psycopg2
 
 host = os.getenv("POSTGRES_HOST", "127.0.0.1")
-port = int(os.getenv("POSTGRES_PORT", "5432"))
+port = int(os.getenv("POSTGRES_PORT", "5433"))
 user = os.getenv("POSTGRES_USER", "airflow")
 password = os.getenv("POSTGRES_PASSWORD", "airflow")
 db = os.getenv("POSTGRES_DB", "airflow")

@@ -51,7 +51,7 @@ KAFKA_TOPIC_RAW         = os.getenv("KAFKA_TOPIC_RAW", "flights_raw")
 KAFKA_GROUP_ID          = os.getenv("KAFKA_GROUP_ID", "flight_consumers")
 
 POSTGRES_HOST     = os.getenv("POSTGRES_HOST", "localhost")
-POSTGRES_PORT     = int(os.getenv("POSTGRES_PORT", "5432"))
+POSTGRES_PORT     = int(os.getenv("POSTGRES_PORT", "5433"))
 POSTGRES_USER     = os.getenv("POSTGRES_USER", "airflow")
 POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD", "airflow")
 POSTGRES_DB       = os.getenv("POSTGRES_DB", "airflow")
