@@ -11,10 +11,10 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 
-from dashboard.utils.data_loader  import get_pipeline_health, get_run_metrics_history
-from dashboard.utils.formatters   import health_colour, fmt_number, fmt_pct
-from dashboard.components.kpi_cards import render_kpi_row, render_health_badge
-from dashboard.components.charts   import pipeline_metrics_timeline
+from utils.data_loader  import get_pipeline_health, get_run_metrics_history
+from utils.formatters   import health_colour, fmt_number, fmt_pct
+from components.kpi_cards import render_kpi_row, render_health_badge
+from components.charts   import pipeline_metrics_timeline
 
 st.title("⚙️ Pipeline Health")
 st.caption("Engineering observability · Refreshed every 30 seconds")

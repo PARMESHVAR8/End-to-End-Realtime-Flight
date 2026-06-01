@@ -17,9 +17,9 @@ import pydeck   as pdk
 import pandas   as pd
 import plotly.express as px
 
-from dashboard.utils.data_loader  import get_live_flight_positions, get_active_flights
-from dashboard.utils.formatters   import fmt_number, fmt_pct, fmt_altitude, fmt_speed
-from dashboard.components.kpi_cards import render_kpi_row
+from utils.data_loader  import get_live_flight_positions, get_active_flights
+from utils.formatters   import fmt_number, fmt_pct, fmt_altitude, fmt_speed
+from components.kpi_cards import render_kpi_row
 
 st.title("🗺️ Live Flight Map")
 st.caption("Flight positions updated every 60 seconds · Last 15 minutes of data")

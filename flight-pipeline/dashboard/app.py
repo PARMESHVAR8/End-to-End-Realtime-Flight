@@ -93,7 +93,7 @@ with st.sidebar:
     st.divider()
 
     # Global airline filter (used by pages via session state)
-    from dashboard.utils.data_loader import get_airline_league_table
+    from utils.data_loader import get_airline_league_table
     airlines_df = get_airline_league_table()
     airline_options = ["All Airlines"]
     if not airlines_df.empty and "airline_name" in airlines_df.columns:
@@ -126,9 +126,9 @@ st.title("✈ Flight Data Pipeline Dashboard")
 st.caption("Powered by Kafka → Airflow → Snowflake → Streamlit")
 
 # Global KPI header
-from dashboard.utils.data_loader import get_active_flights, get_pipeline_health
-from dashboard.utils.formatters  import fmt_number, fmt_pct, fmt_minutes
-from dashboard.components.kpi_cards import render_kpi_row, render_health_badge
+from utils.data_loader import get_active_flights, get_pipeline_health
+from utils.formatters  import fmt_number, fmt_pct, fmt_minutes
+from components.kpi_cards import render_kpi_row, render_health_badge
 
 col_health, col_spacer = st.columns([3, 1])
 with col_health:

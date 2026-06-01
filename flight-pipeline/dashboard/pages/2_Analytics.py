@@ -9,19 +9,19 @@ Uses tabs to organise without overwhelming the user.
 import streamlit as st
 import pandas as pd
 
-from dashboard.utils.data_loader import (
+from utils.data_loader import (
     get_airline_league_table, get_delay_patterns, get_peak_hours,
     get_route_efficiency, get_weekly_trends, get_airport_congestion,
     get_intl_vs_domestic,
 )
-from dashboard.components.charts import (
+from components.charts import (
     airline_otp_bar_chart, delay_heatmap, peak_hours_area_chart,
     route_efficiency_scatter, weekly_trend_line, airport_congestion_bars,
 )
-from dashboard.utils.formatters import (
+from utils.formatters import (
     fmt_number, fmt_pct, fmt_minutes, route_health_emoji
 )
-from dashboard.components.kpi_cards import render_kpi_row
+from components.kpi_cards import render_kpi_row
 
 st.title("📊 Analytics")
 st.caption("Business performance insights · Refreshed every 5 minutes")

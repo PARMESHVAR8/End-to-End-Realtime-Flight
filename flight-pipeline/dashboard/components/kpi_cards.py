@@ -7,7 +7,7 @@ Used on every page for consistent headline metrics.
 """
 
 import streamlit as st
-from dashboard.utils.formatters import (
+from utils.formatters import (
     fmt_number, fmt_pct, fmt_minutes, health_colour
 )
 
