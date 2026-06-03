@@ -5,7 +5,8 @@ Page 2 — Analytics
 Business performance analytics across all 10 query results.
 Uses tabs to organise without overwhelming the user.
 """
-
+import sys, os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import streamlit as st
 import pandas as pd
 

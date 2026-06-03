@@ -11,7 +11,8 @@ WHY PYDECK:
   rotation, lighting effects. Used by Uber's data teams.
   st.pydeck_chart() renders Pydeck directly in Streamlit.
 """
-
+import sys, os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import streamlit as st
 import pydeck   as pdk
 import pandas   as pd

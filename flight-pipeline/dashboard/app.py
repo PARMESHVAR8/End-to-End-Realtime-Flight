@@ -20,7 +20,19 @@ AUTO-REFRESH:
   Combined with st.cache_data(ttl=60), only expired queries
   re-run — cached results stay fast.
 """
+import sys
+import os
 
+dashboard_dir = os.path.dirname(os.path.abspath(__file__))
+if dashboard_dir not in sys.path:
+    sys.path.insert(0, dashboard_dir)
+
+# Also add project root for other imports
+project_root = os.path.dirname(dashboard_dir)
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
+    
 import streamlit as st
 from streamlit_autorefresh import st_autorefresh
 
@@ -94,6 +106,9 @@ with st.sidebar:
 
     # Global airline filter (used by pages via session state)
     from utils.data_loader import get_airline_league_table
+    from utils.data_loader import get_active_flights, get_pipeline_health
+    from utils.formatters  import fmt_number, fmt_pct, fmt_minutes
+    from components.kpi_cards import render_kpi_row, render_health_badge
     airlines_df = get_airline_league_table()
     airline_options = ["All Airlines"]
     if not airlines_df.empty and "airline_name" in airlines_df.columns:
@@ -126,9 +141,9 @@ st.title("✈ Flight Data Pipeline Dashboard")
 st.caption("Powered by Kafka → Airflow → Snowflake → Streamlit")
 
 # Global KPI header
-from utils.data_loader import get_active_flights, get_pipeline_health
-from utils.formatters  import fmt_number, fmt_pct, fmt_minutes
-from components.kpi_cards import render_kpi_row, render_health_badge
+# from utils.data_loader import get_active_flights, get_pipeline_health
+# from utils.formatters  import fmt_number, fmt_pct, fmt_minutes
+# from components.kpi_cards import render_kpi_row, render_health_badge
 
 col_health, col_spacer = st.columns([3, 1])
 with col_health:
