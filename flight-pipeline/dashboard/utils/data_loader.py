@@ -105,56 +105,59 @@ def _query_snowflake(sql: str, params: tuple = ()) -> pd.DataFrame:
 # Each function is decorated with @st.cache_data(ttl=N)
 # The ttl argument tells Streamlit how many seconds to keep the cached result.
 # When TTL expires, Streamlit re-runs the function on the next call.
-
 @st.cache_data(ttl=CACHE_TTL["live"], show_spinner=False)
 def get_active_flights() -> pd.DataFrame:
-    """
-    Fetch currently active flights for the live map.
-    Refreshes every 60 seconds.
-    """
+    """Active airlines - relaxed time filter."""
     return _query_snowflake("""
         SELECT
-            airline_iata,
-            airline_name,
-            active_flights,
-            avg_altitude_ft,
-            avg_speed_kmh,
-            avg_delay_minutes,
-            pct_delayed,
-            last_seen_at
-        FROM FLIGHT_DB.ANALYTICS.V_ACTIVE_AIRLINES_NOW
+            f.airline_iata,
+            COALESCE(da.airline_name, f.airline_iata) AS airline_name,
+            COUNT(DISTINCT f.flight_id)               AS active_flights,
+            ROUND(AVG(f.altitude), 0)                 AS avg_altitude_ft,
+            ROUND(AVG(f.speed), 1)                    AS avg_speed_kmh,
+            ROUND(AVG(f.delay_minutes), 1)            AS avg_delay_minutes,
+            ROUND(
+                SUM(IFF(f.delay_bucket != 'on_time', 1, 0))::FLOAT
+                / NULLIF(COUNT(*), 0) * 100, 1
+            )                                         AS pct_delayed,
+            MAX(f.event_timestamp)                    AS last_seen_at
+        FROM FLIGHT_DB.ANALYTICS.FACT_FLIGHTS f
+        LEFT JOIN FLIGHT_DB.ANALYTICS.DIM_AIRLINES da
+               ON f.airline_iata = da.airline_code
+        WHERE f.event_date = CURRENT_DATE()
+          AND f.data_quality_flag = FALSE
+        GROUP BY f.airline_iata, da.airline_name
+        HAVING COUNT(DISTINCT f.flight_id) >= 1
         ORDER BY active_flights DESC
-        LIMIT 50
+        LIMIT 20
     """)
-
-
 @st.cache_data(ttl=CACHE_TTL["live"], show_spinner=False)
 def get_live_flight_positions() -> pd.DataFrame:
-    """
-    Fetch individual flight positions for map markers.
-    Uses FACT_FLIGHTS_TODAY view for speed.
-    """
+    """Fetch flight positions for live map."""
     return _query_snowflake("""
         SELECT
             flight_id,
             airline_iata,
             source_airport,
             dest_airport,
-            route_key,
+            COALESCE(route_key, source_airport || '→' || dest_airport) AS route_key,
             latitude,
             longitude,
             altitude,
             speed,
             status,
             delay_minutes,
-            delay_bucket,
-            flight_phase,
+            COALESCE(delay_bucket, 'on_time')   AS delay_bucket,
+            COALESCE(flight_phase, 'cruise')     AS flight_phase,
             is_international,
             event_timestamp
         FROM FLIGHT_DB.ANALYTICS.FACT_FLIGHTS
         WHERE event_date = CURRENT_DATE()
           AND data_quality_flag = FALSE
-          AND event_timestamp >= DATEADD(minute, -15, CURRENT_TIMESTAMP())
+          AND latitude IS NOT NULL
+          AND longitude IS NOT NULL
+          AND latitude != 0
+          AND longitude != 0
         QUALIFY ROW_NUMBER() OVER (
             PARTITION BY flight_id
             ORDER BY event_timestamp DESC
@@ -162,8 +165,6 @@ def get_live_flight_positions() -> pd.DataFrame:
         ORDER BY event_timestamp DESC
         LIMIT 500
     """)
-
-
 @st.cache_data(ttl=CACHE_TTL["analytics"], show_spinner=False)
 def get_airline_league_table() -> pd.DataFrame:
     """Airline performance rankings. Refreshes every 5 minutes."""
@@ -296,6 +297,7 @@ def get_airport_congestion() -> pd.DataFrame:
 @st.cache_data(ttl=CACHE_TTL["health"], show_spinner=False)
 def get_pipeline_health() -> dict:
     """Pipeline health scorecard. Refreshes every 30 seconds."""
+
     df = _query_snowflake("""
         SELECT
             overall_health,
@@ -313,11 +315,27 @@ def get_pipeline_health() -> dict:
             report_generated_at
         FROM FLIGHT_DB.ANALYTICS.V_PIPELINE_HEALTH
     """)
+
     if df.empty:
         return {}
-    return df.iloc[0].to_dict()
 
+    kpis = df.iloc[0].to_dict()
 
+    # Active Flights KPI
+    active_df = _query_snowflake("""
+        SELECT COUNT(DISTINCT flight_id) AS total_active
+        FROM FLIGHT_DB.ANALYTICS.FACT_FLIGHTS
+        WHERE event_date = CURRENT_DATE()
+          AND data_quality_flag = FALSE
+    """)
+
+    kpis["active_flights_now"] = (
+        int(active_df.iloc[0]["total_active"])
+        if not active_df.empty
+        else 0
+    )
+
+    return kpis
 @st.cache_data(ttl=CACHE_TTL["health"], show_spinner=False)
 def get_run_metrics_history() -> pd.DataFrame:
     """Last 50 pipeline run metrics for history chart."""

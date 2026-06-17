@@ -107,6 +107,11 @@ with st.sidebar:
     # Global airline filter (used by pages via session state)
     from utils.data_loader import get_airline_league_table
     from utils.data_loader import get_active_flights, get_pipeline_health
+    from utils.data_loader import (
+    get_active_flights,
+    get_pipeline_health,
+    get_active_flights_count,    # ← YE ADD KARO
+)
     from utils.formatters  import fmt_number, fmt_pct, fmt_minutes
     from components.kpi_cards import render_kpi_row, render_health_badge
     airlines_df = get_airline_league_table()

@@ -87,17 +87,33 @@ def get_snowflake_connection():
     )
 
 
-def get_postgres_connection():
-    """Returns a psycopg2 connection to the staging PostgreSQL database."""
-    import psycopg2
-    return psycopg2.connect(
-        host    = os.getenv("POSTGRES_HOST", "postgres"),
-        port    = int(os.getenv("POSTGRES_PORT", "5433")),
-        user    = os.getenv("POSTGRES_USER", "airflow"),
-        password= os.getenv("POSTGRES_PASSWORD", "airflow"),
-        dbname  = os.getenv("POSTGRES_DB", "airflow"),
-    )
+# airflow/dags/dag_utils.py
+# Ye function dhundho aur update karo:
 
+def get_postgres_connection():
+    """Returns psycopg2 connection to staging PostgreSQL."""
+    import psycopg2
+    import os
+
+    # Docker ke andar host.docker.internal use karo
+    host = os.getenv("POSTGRES_HOST", "host.docker.internal")
+    port = int(os.getenv("POSTGRES_PORT", "5433"))
+
+    # Dono ports try karo
+    for try_port in [port, 5433, 5432]:
+        try:
+            conn = psycopg2.connect(
+                host     = host,
+                port     = try_port,
+                user     = os.getenv("POSTGRES_USER", "airflow"),
+                password = os.getenv("POSTGRES_PASSWORD", "airflow"),
+                dbname   = os.getenv("POSTGRES_DB", "airflow"),
+            )
+            return conn
+        except Exception:
+            continue
+
+    raise RuntimeError(f"Cannot connect to PostgreSQL on {host}:{port}")
 
 def alert_on_failure(context: dict) -> None:
     """

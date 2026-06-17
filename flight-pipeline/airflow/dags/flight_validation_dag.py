@@ -279,17 +279,17 @@ with DAG(
         """,
         trigger_rule = "none_failed_min_one_success",
     )
-    from monitoring.pipeline_monitor import airflow_health_check, airflow_daily_summary
+    # from monitoring.pipeline_monitor import airflow_health_check, airflow_daily_summary
 
-    run_health_check = PythonOperator(
-        task_id         = "run_full_health_check",
-        python_callable = airflow_health_check,
-        dag             = dag,
-    )
+    # run_health_check = PythonOperator(
+    #     task_id         = "run_full_health_check",
+    #     python_callable = airflow_health_check,
+    #     dag             = dag,
+    # )
 
 
     # ── Task Dependencies ─────────────────────────────────────────────────────
     run_quality_checks >> check_thresholds
     check_thresholds   >> [send_quality_alert, log_pipeline_healthy]
     [send_quality_alert, log_pipeline_healthy] >> update_quality_log
-    update_quality_log >> run_health_check
+    # update_quality_log >> run_health_check

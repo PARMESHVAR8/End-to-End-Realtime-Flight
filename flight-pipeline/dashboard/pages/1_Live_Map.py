@@ -157,6 +157,7 @@ tooltip = {
     "style": {"padding": "0"},
 }
 
+
 st.pydeck_chart(
     pdk.Deck(
         layers          = [scatter_layer, text_layer],
@@ -165,7 +166,6 @@ st.pydeck_chart(
         map_style       = "mapbox://styles/mapbox/dark-v11",
     ),
     use_container_width = True,
-    height              = 550,
 )
 
 # ── Legend ────────────────────────────────────────────────────────────────────
