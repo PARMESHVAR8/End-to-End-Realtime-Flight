@@ -1,0 +1,15 @@
+kafka-python==2.0.2
+confluent-kafka==2.4.0
+
+pandas==2.2.2
+numpy==1.26.4
+
+snowflake-connector-python==3.10.1
+snowflake-sqlalchemy==1.5.3
+
+psycopg2-binary==2.9.9
+SQLAlchemy==1.4.52
+
+python-dotenv==1.0.1
+python-json-logger==2.0.7
+tenacity==8.3.0
