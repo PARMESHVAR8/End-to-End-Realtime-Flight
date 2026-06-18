@@ -106,7 +106,7 @@ with st.sidebar:
 
     # Global airline filter (used by pages via session state)
     from utils.data_loader import get_airline_league_table
-    from utils.data_loader import get_active_flights, get_pipeline_health
+    # from utils.data_loader import get_active_flights, get_pipeline_health
     from utils.data_loader import (
     get_active_flights,
     get_pipeline_health,

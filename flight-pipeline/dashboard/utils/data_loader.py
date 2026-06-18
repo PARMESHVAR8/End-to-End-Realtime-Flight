@@ -371,3 +371,13 @@ def get_intl_vs_domestic() -> pd.DataFrame:
             unique_routes
         FROM FLIGHT_DB.ANALYTICS.V_INTL_VS_DOMESTIC
     """)
+
+
+@st.cache_data(ttl=CACHE_TTL["live"], show_spinner=False)
+def get_active_flights_count():
+    df = get_active_flights()
+
+    if df.empty:
+        return 0
+
+    return int(df["active_flights"].sum())
